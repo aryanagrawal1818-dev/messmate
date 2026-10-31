@@ -147,7 +147,9 @@ export const VendorView: React.FC<VendorViewProps> = ({
         `Assigned your account as the operator for ${sampleOutlet.name}. You now manage only this outlet's menu, slots, and orders.`
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `outlets/${sampleOutlet.id}`);
+      setStatusMessage(
+        handleFirestoreError(err, OperationType.UPDATE, `outlets/${sampleOutlet.id}`)
+      );
     }
   };
 
@@ -173,7 +175,9 @@ export const VendorView: React.FC<VendorViewProps> = ({
         `Order ${order.orderNumber} updated to "${nextStatus.replace(/_/g, ' ')}".`
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `orders/${order.id}`);
+      setStatusMessage(
+        handleFirestoreError(err, OperationType.UPDATE, `orders/${order.id}`)
+      );
     }
   };
 
@@ -188,7 +192,9 @@ export const VendorView: React.FC<VendorViewProps> = ({
         `"${item.name}" is now marked ${!item.isSoldOut ? 'SOLD OUT' : 'IN STOCK'}.`
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `menuItems/${item.id}`);
+      setStatusMessage(
+        handleFirestoreError(err, OperationType.UPDATE, `menuItems/${item.id}`)
+      );
     }
   };
 
@@ -233,7 +239,9 @@ export const VendorView: React.FC<VendorViewProps> = ({
       setNewMealDesc('');
       setStatusMessage(`Added "${newMealName}" to ${activeOutlet.name}.`);
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `menuItems/${itemId}`);
+      setStatusMessage(
+        handleFirestoreError(err, OperationType.CREATE, `menuItems/${itemId}`)
+      );
     }
   };
 
@@ -253,7 +261,9 @@ export const VendorView: React.FC<VendorViewProps> = ({
         `Updated capacity for ${slot.label} to ${slot.bookedCount}/${nextCap}.`
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `pickupSlots/${slot.id}`);
+      setStatusMessage(
+        handleFirestoreError(err, OperationType.UPDATE, `pickupSlots/${slot.id}`)
+      );
     }
   };
 
@@ -282,7 +292,9 @@ export const VendorView: React.FC<VendorViewProps> = ({
       await batch.commit();
       setStatusMessage(`Added pickup slot "${newSlotLabel}" with capacity ${maxCap}.`);
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `pickupSlots/${slotId}`);
+      setStatusMessage(
+        handleFirestoreError(err, OperationType.CREATE, `pickupSlots/${slotId}`)
+      );
     }
   };
 

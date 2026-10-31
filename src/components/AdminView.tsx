@@ -72,7 +72,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
         `Updated platform commission for ${outlet.name} to ${clampedRate}%.`
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `outlets/${outlet.id}`);
+      setFeedback(
+        handleFirestoreError(err, OperationType.UPDATE, `outlets/${outlet.id}`)
+      );
     }
   };
 
@@ -86,7 +88,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
         `${outlet.name} is now ${!outlet.isActive ? 'Active' : 'Paused'}.`
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `outlets/${outlet.id}`);
+      setFeedback(
+        handleFirestoreError(err, OperationType.UPDATE, `outlets/${outlet.id}`)
+      );
     }
   };
 
@@ -120,7 +124,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
       setNewOutletName('');
       setFeedback(`Created partner outlet "${newOutletName}".`);
     } catch (err) {
-      handleFirestoreError(err, OperationType.CREATE, `outlets/${outletId}`);
+      setFeedback(
+        handleFirestoreError(err, OperationType.CREATE, `outlets/${outletId}`)
+      );
     }
   };
 
@@ -139,7 +145,9 @@ export const AdminView: React.FC<AdminViewProps> = ({
         `Updated ${targetUser.displayName} (${targetUser.email}) to role "${nextRole}".`
       );
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `users/${targetUser.uid}`);
+      setFeedback(
+        handleFirestoreError(err, OperationType.UPDATE, `users/${targetUser.uid}`)
+      );
     }
   };
 

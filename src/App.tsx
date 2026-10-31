@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   onAuthStateChanged,
   signInWithPopup,
@@ -21,10 +21,12 @@ import {
   where,
 } from 'firebase/firestore';
 import {
+  AlertTriangle,
   ArrowRight,
-  Clock,
+  Loader2,
   LogIn,
   LogOut,
+  RefreshCw,
   ShieldCheck,
   Store,
   UserCheck,
@@ -37,6 +39,7 @@ import {
   googleProvider,
   handleFirestoreError,
   OperationType,
+  sanitizeErrorMessage,
 } from './firebase';
 import {
   clampString,
@@ -57,7 +60,11 @@ export default function App() {
   const [firebaseUser, setFirebaseUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [authReady, setAuthReady] = useState(false);
+  const [isInitializingProfile, setIsInitializingProfile] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [profileInitError, setProfileInitError] = useState<string | null>(null);
+  const [listenerError, setListenerError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   // Active portal view for classroom demonstration
   const [activePortal, setActivePortal] = useState<UserRole>('student');
@@ -84,74 +91,134 @@ export default function App() {
     [firebaseUser]
   );
 
-  // 1. Track Firebase Authentication & Synchronize UserProfile in Firestore
+  // 1. Non-throwing Auth State Listener — always settles authReady = true
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, async (user) => {
-      setFirebaseUser(user);
-      setAuthError(null);
-
-      if (!user) {
-        setUserProfile(null);
+    const unsubAuth = onAuthStateChanged(
+      auth,
+      (user) => {
+        setFirebaseUser(user);
+        if (!user) {
+          setUserProfile(null);
+          setProfileInitError(null);
+          setListenerError(null);
+          setIsInitializingProfile(false);
+        }
         setAuthReady(true);
-        return;
+      },
+      (err) => {
+        const msg = handleFirestoreError(err, OperationType.GET, 'auth/state');
+        setAuthError(msg);
+        setIsInitializingProfile(false);
+        setAuthReady(true);
       }
+    );
 
-      const userRef = doc(db, 'users', user.uid);
+    return () => unsubAuth();
+  }, []);
+
+  // 2. Non-throwing UserProfile Initialization & Profile Snapshot Listener (re-runs on retryCount)
+  useEffect(() => {
+    if (!authReady || !firebaseUser) {
+      setIsInitializingProfile(false);
+      return;
+    }
+
+    let isCancelled = false;
+    let unsubProfile: (() => void) | undefined;
+
+    const initializeAndListenProfile = async () => {
+      setIsInitializingProfile(true);
+      setProfileInitError(null);
+
       try {
+        // Attempt token refresh first so expired/disabled token service errors surface clearly
+        await firebaseUser.getIdToken(false);
+
+        const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
+
+        if (isCancelled) return;
+
         const defaultRole: UserRole =
-          user.email?.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase()
+          firebaseUser.email?.toLowerCase() === BOOTSTRAPPED_ADMIN_EMAIL.toLowerCase()
             ? 'admin'
             : 'student';
 
         if (!snap.exists()) {
           await setDoc(userRef, {
-            uid: user.uid,
+            uid: firebaseUser.uid,
             displayName: clampString(
-              user.displayName || user.email?.split('@')[0] || 'Campus Student',
+              firebaseUser.displayName ||
+                firebaseUser.email?.split('@')[0] ||
+                'Campus Student',
               1,
               100,
               'Campus Student'
             ),
-            email: clampString(user.email || 'student@campus.edu', 3, 150, 'student@campus.edu'),
+            email: clampString(
+              firebaseUser.email || 'student@campus.edu',
+              3,
+              150,
+              'student@campus.edu'
+            ),
             role: defaultRole,
             assignedOutletId: 'none',
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
+        } else {
+          setUserProfile(snap.data() as UserProfile);
         }
+
+        if (isCancelled) return;
+
+        unsubProfile = onSnapshot(
+          userRef,
+          (profileSnap) => {
+            if (isCancelled) return;
+            if (profileSnap.exists()) {
+              setUserProfile(profileSnap.data() as UserProfile);
+              setProfileInitError(null);
+            }
+            setIsInitializingProfile(false);
+          },
+          (err) => {
+            if (isCancelled) return;
+            const msg = handleFirestoreError(
+              err,
+              OperationType.GET,
+              'users/profile'
+            );
+            setProfileInitError(msg);
+            setIsInitializingProfile(false);
+          }
+        );
       } catch (err) {
-        handleFirestoreError(err, OperationType.WRITE, `users/${user.uid}`);
-      }
-
-      setAuthReady(true);
-    });
-
-    return () => unsubAuth();
-  }, []);
-
-  // 2. Listen to Current User Profile Document
-  useEffect(() => {
-    if (!authReady || !firebaseUser) return;
-
-    const userRef = doc(db, 'users', firebaseUser.uid);
-    const unsubProfile = onSnapshot(
-      userRef,
-      (snap) => {
-        if (snap.exists()) {
-          const data = snap.data() as UserProfile;
-          setUserProfile(data);
+        if (isCancelled) return;
+        const msg = handleFirestoreError(
+          err,
+          OperationType.WRITE,
+          'users/profile'
+        );
+        setProfileInitError(msg);
+      } finally {
+        if (!isCancelled) {
+          setIsInitializingProfile(false);
         }
-      },
-      (err) => handleFirestoreError(err, OperationType.GET, `users/${firebaseUser.uid}`)
-    );
+      }
+    };
 
-    return () => unsubProfile();
-  }, [authReady, firebaseUser]);
+    initializeAndListenProfile();
 
-  // 3. Attach Real-Time Listeners for Outlets, MenuItems, PickupSlots, and Orders
+    return () => {
+      isCancelled = true;
+      if (unsubProfile) unsubProfile();
+    };
+  }, [authReady, firebaseUser, retryCount]);
+
+  // 3. Real-Time Collection Listeners (Non-throwing, re-attached on retryCount)
   useEffect(() => {
-    if (!authReady || !firebaseUser) {
+    if (!authReady || !firebaseUser || !userProfile) {
       setOutlets([]);
       setMenuItems([]);
       setPickupSlots([]);
@@ -161,6 +228,8 @@ export default function App() {
       setAllUsers([]);
       return;
     }
+
+    setListenerError(null);
 
     // Outlets listener (matching Firestore list rules)
     const outletsQuery = isBootstrappedAdmin
@@ -179,10 +248,15 @@ export default function App() {
           seedClassroomSampleData(
             firebaseUser.uid,
             firebaseUser.displayName || 'Campus Partner Operator'
-          ).catch((e) => console.error('Initial sample seed deferred:', e));
+          ).catch((e) => {
+            console.warn('Initial sample seed deferred:', sanitizeErrorMessage(e));
+          });
         }
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'outlets')
+      (err) => {
+        const msg = handleFirestoreError(err, OperationType.LIST, 'outlets');
+        setListenerError(msg);
+      }
     );
 
     // MenuItems listener
@@ -195,7 +269,10 @@ export default function App() {
       (snap) => {
         setMenuItems(snap.docs.map((d) => d.data() as MenuItem));
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'menuItems')
+      (err) => {
+        const msg = handleFirestoreError(err, OperationType.LIST, 'menuItems');
+        setListenerError(msg);
+      }
     );
 
     // PickupSlots listener
@@ -208,7 +285,10 @@ export default function App() {
       (snap) => {
         setPickupSlots(snap.docs.map((d) => d.data() as PickupSlot));
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'pickupSlots')
+      (err) => {
+        const msg = handleFirestoreError(err, OperationType.LIST, 'pickupSlots');
+        setListenerError(msg);
+      }
     );
 
     // Student's own orders listener (strictly isolated by studentId == uid)
@@ -226,7 +306,10 @@ export default function App() {
         );
         setStudentOrders(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'orders (student)')
+      (err) => {
+        const msg = handleFirestoreError(err, OperationType.LIST, 'orders (student)');
+        setListenerError(msg);
+      }
     );
 
     // Vendor's own outlet orders listener (strictly isolated by vendorId == uid)
@@ -244,7 +327,10 @@ export default function App() {
         );
         setVendorOrders(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'orders (vendor)')
+      (err) => {
+        const msg = handleFirestoreError(err, OperationType.LIST, 'orders (vendor)');
+        setListenerError(msg);
+      }
     );
 
     // Admin platform-wide orders & users listeners
@@ -262,7 +348,10 @@ export default function App() {
           );
           setAllOrders(list);
         },
-        (err) => handleFirestoreError(err, OperationType.LIST, 'orders (admin)')
+        (err) => {
+          const msg = handleFirestoreError(err, OperationType.LIST, 'orders (admin)');
+          setListenerError(msg);
+        }
       );
 
       unsubAllUsers = onSnapshot(
@@ -270,7 +359,10 @@ export default function App() {
         (snap) => {
           setAllUsers(snap.docs.map((d) => d.data() as UserProfile));
         },
-        (err) => handleFirestoreError(err, OperationType.LIST, 'users (admin)')
+        (err) => {
+          const msg = handleFirestoreError(err, OperationType.LIST, 'users (admin)');
+          setListenerError(msg);
+        }
       );
     }
 
@@ -283,36 +375,80 @@ export default function App() {
       if (unsubAllOrders) unsubAllOrders();
       if (unsubAllUsers) unsubAllUsers();
     };
-  }, [authReady, firebaseUser, isBootstrappedAdmin]);
+  }, [authReady, firebaseUser, userProfile, isBootstrappedAdmin, retryCount]);
 
   const handleGoogleSignIn = async () => {
     setAuthError(null);
+    setProfileInitError(null);
+    setListenerError(null);
     try {
       await signInWithPopup(auth, googleProvider);
     } catch (err) {
       setAuthError(
-        err instanceof Error ? err.message : 'Google Sign-In was interrupted.'
+        handleFirestoreError(err, OperationType.GET, 'auth/google-popup')
       );
     }
   };
 
   const handleSignOut = async () => {
-    await signOut(auth);
-    setActivePortal('student');
+    setAuthError(null);
+    setProfileInitError(null);
+    setListenerError(null);
+    try {
+      await signOut(auth);
+    } catch (err) {
+      setAuthError(handleFirestoreError(err, OperationType.GET, 'auth/signout'));
+    } finally {
+      setUserProfile(null);
+      setActivePortal('student');
+    }
   };
+
+  const handleRetryInitialization = useCallback(async () => {
+    setAuthError(null);
+    setProfileInitError(null);
+    setListenerError(null);
+    hasAutoSeededRef.current = false;
+
+    if (auth.currentUser) {
+      setIsInitializingProfile(true);
+      try {
+        await auth.currentUser.getIdToken(true);
+      } catch (err) {
+        const msg = handleFirestoreError(err, OperationType.GET, 'auth/token-refresh');
+        setProfileInitError(msg);
+        setIsInitializingProfile(false);
+        return;
+      }
+    }
+
+    setRetryCount((prev) => prev + 1);
+  }, []);
 
   const handleSeedData = async () => {
     if (!firebaseUser) return;
     setIsSeeding(true);
     try {
-      await seedClassroomSampleData(
+      const result = await seedClassroomSampleData(
         firebaseUser.uid,
         firebaseUser.displayName || 'Campus Partner Operator'
+      );
+      if (!result.ok && result.error) {
+        setListenerError(result.error);
+      } else {
+        setListenerError(null);
+      }
+    } catch (err) {
+      setListenerError(
+        handleFirestoreError(err, OperationType.WRITE, 'sample-catalog-seed')
       );
     } finally {
       setIsSeeding(false);
     }
   };
+
+  const activeErrorMessage = authError || profileInitError || listenerError;
+  const showSignedOutCatalog = !firebaseUser || !userProfile;
 
   return (
     <div className="min-h-screen flex flex-col bg-[#FAF8F5] text-stone-900">
@@ -380,14 +516,83 @@ export default function App() {
 
       {/* MAIN CONTENT CONTAINER */}
       <main id="top" className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-12">
-        {authError && (
-          <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-900 text-sm">
-            {authError}
+        {/* LOADING SETTLEMENT BANNER */}
+        {(!authReady || (firebaseUser && isInitializingProfile && !userProfile)) && (
+          <div className="p-6 rounded-2xl bg-white border border-stone-200 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Loader2 className="w-5 h-5 text-amber-700 animate-spin shrink-0" />
+              <div>
+                <h2 className="text-sm font-bold text-stone-900">
+                  Connecting to MessMate Cloud Database...
+                </h2>
+                <p className="text-xs text-stone-500">
+                  Verifying Google session and loading your Firestore account profile.
+                </p>
+              </div>
+            </div>
+            {firebaseUser && (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                className="min-h-[40px] px-3.5 py-2 rounded-xl border border-stone-200 text-xs font-semibold text-stone-700 hover:bg-stone-50 whitespace-nowrap shrink-0"
+              >
+                Sign Out
+              </button>
+            )}
           </div>
         )}
 
-        {/* SIGNED-OUT LANDING & CLASSROOM PREVIEW */}
-        {!firebaseUser && (
+        {/* RETRYABLE ERROR UI (Shown on Auth, Token Service, Profile Init, or Listener Failure) */}
+        {activeErrorMessage && (
+          <div
+            role="alert"
+            className="p-6 rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-950 space-y-4"
+          >
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="w-5 h-5 text-rose-700 shrink-0 mt-0.5" />
+              <div className="space-y-1">
+                <h2 className="text-base font-bold text-rose-950">
+                  Account Profile or Cloud Connection Could Not Initialize
+                </h2>
+                <p className="text-xs sm:text-sm text-rose-900 leading-relaxed">
+                  {activeErrorMessage}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={handleRetryInitialization}
+                disabled={isInitializingProfile}
+                className="min-h-[42px] px-4 py-2 rounded-xl bg-stone-900 hover:bg-stone-800 disabled:opacity-50 text-white text-xs font-semibold transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+              >
+                <RefreshCw
+                  className={`w-3.5 h-3.5 ${isInitializingProfile ? 'animate-spin' : ''}`}
+                />
+                <span>
+                  {isInitializingProfile
+                    ? 'Retrying Profile & Listeners...'
+                    : 'Retry Profile & Database Connection'}
+                </span>
+              </button>
+
+              {firebaseUser && (
+                <button
+                  type="button"
+                  onClick={handleSignOut}
+                  className="min-h-[42px] px-4 py-2 rounded-xl bg-white hover:bg-stone-100 text-stone-900 border border-stone-300 text-xs font-semibold transition-colors inline-flex items-center gap-2 whitespace-nowrap"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>Sign Out</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* SIGNED-OUT LANDING & CLASSROOM PREVIEW (Also kept visible if profile initialization fails) */}
+        {showSignedOutCatalog && (
           <div className="space-y-14">
             {/* Split Hero Section */}
             <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-stretch">
@@ -405,14 +610,38 @@ export default function App() {
                 </div>
 
                 <div className="pt-2 flex flex-col sm:flex-row sm:items-center gap-4">
-                  <button
-                    type="button"
-                    onClick={handleGoogleSignIn}
-                    className="min-h-[48px] px-6 py-3 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <span>Sign in with Google to Start Demo</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
+                  {firebaseUser ? (
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={handleRetryInitialization}
+                        disabled={isInitializingProfile}
+                        className="min-h-[48px] px-6 py-3 rounded-xl bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                      >
+                        <RefreshCw
+                          className={`w-4 h-4 ${isInitializingProfile ? 'animate-spin' : ''}`}
+                        />
+                        <span>Retry Loading Live Workspace</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleSignOut}
+                        className="min-h-[48px] px-5 py-3 rounded-xl border border-stone-300 bg-white hover:bg-stone-50 text-stone-800 text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                      >
+                        <LogOut className="w-4 h-4" />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleGoogleSignIn}
+                      className="min-h-[48px] px-6 py-3 rounded-xl bg-amber-700 hover:bg-amber-800 text-white text-sm font-semibold transition-colors inline-flex items-center justify-center gap-2 whitespace-nowrap"
+                    >
+                      <span>Sign in with Google to Start Demo</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  )}
                   <div className="text-xs text-stone-500">
                     <div>Accounts, menus &amp; orders persist in Cloud Firestore</div>
                     <div>Zero real money collected · Split commission ledger</div>
@@ -472,7 +701,7 @@ export default function App() {
               </div>
             </section>
 
-            {/* Preview of Sample Outlets & Meals Before Sign-In */}
+            {/* Preview of Sample Outlets & Meals */}
             <section id="outlets" className="space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
                 <div>
@@ -484,7 +713,9 @@ export default function App() {
                   </h2>
                 </div>
                 <p className="text-xs text-stone-500">
-                  Sign in with Google above to place live orders and test role switching
+                  {firebaseUser
+                    ? 'Resolve the cloud connection banner above and click Retry to place live Firestore orders'
+                    : 'Sign in with Google above to place live orders and test role switching'}
                 </p>
               </div>
 

@@ -449,7 +449,7 @@ export const SAMPLE_PICKUP_SLOTS: SampleSlotSeed[] = [
 export async function seedClassroomSampleData(
   vendorUid: string,
   vendorDisplayName: string
-): Promise<void> {
+): Promise<{ ok: boolean; error?: string }> {
   const safeVendorName = (vendorDisplayName || 'Campus Partner Operator').slice(0, 100);
 
   // Batch 1: Create/update parent outlets first so `exists()` rules pass on children
@@ -467,7 +467,8 @@ export async function seedClassroomSampleData(
     }
     await outletBatch.commit();
   } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, 'outlets');
+    const msg = handleFirestoreError(err, OperationType.WRITE, 'outlets');
+    return { ok: false, error: msg };
   }
 
   // Batch 2: Create/update sample meals and pickup slots
@@ -492,7 +493,9 @@ export async function seedClassroomSampleData(
       });
     }
     await childBatch.commit();
+    return { ok: true };
   } catch (err) {
-    handleFirestoreError(err, OperationType.WRITE, 'menuItems_and_pickupSlots');
+    const msg = handleFirestoreError(err, OperationType.WRITE, 'menuItems_and_pickupSlots');
+    return { ok: false, error: msg };
   }
 }

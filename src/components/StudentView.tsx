@@ -346,7 +346,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
         message: `Order ${orderNumber} placed! Show Pickup PIN ${pickupCode} at ${cartOutlet.name} during ${selectedSlot.label}.`,
       });
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, `orders/${orderId}`);
+      const msg = handleFirestoreError(err, OperationType.WRITE, `orders/${orderId}`);
+      setBannerFeedback({ type: 'error', message: msg });
     } finally {
       setIsSubmittingOrder(false);
     }
@@ -379,7 +380,8 @@ export const StudentView: React.FC<StudentViewProps> = ({
         message: `Order ${order.orderNumber} cancelled and demo payment refunded. Slot capacity restored.`,
       });
     } catch (err) {
-      handleFirestoreError(err, OperationType.UPDATE, `orders/${order.id}`);
+      const msg = handleFirestoreError(err, OperationType.UPDATE, `orders/${order.id}`);
+      setBannerFeedback({ type: 'error', message: msg });
     }
   };
 
