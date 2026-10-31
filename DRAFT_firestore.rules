@@ -196,7 +196,7 @@ service cloud.firestore {
     // =========================================================================
     match /users/{userId} {
       allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
-      allow list: if isBootstrappedAdmin() && resource.data.uid is string;
+      allow list: if isBootstrappedAdmin();
 
       allow create: if isVerified()
         && isValidId(userId)
@@ -240,7 +240,7 @@ service cloud.firestore {
     // =========================================================================
     match /admins/{adminId} {
       allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
-      allow list: if isBootstrappedAdmin() && resource.data.uid is string;
+      allow list: if isBootstrappedAdmin();
 
       allow create: if isAdmin()
         && isValidId(adminId)

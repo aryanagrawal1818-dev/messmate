@@ -2,10 +2,10 @@
 
 ## 1. Data Invariants
 
-1. **Identity & Role Integrity (`users/{userId}`)**:
+1. **Identity & Role Integrity (`users/{userId}`, `admins/{adminId}`)**:
    - A non-admin user can only create their own `users/{userId}` document with `uid == request.auth.uid`, `role == 'student'`, and `assignedOutletId == 'none'`.
    - Non-admin users can never escalate their own `role` to `'vendor'` or `'admin'`.
-   - Reading `/users/{userId}` is strictly restricted to the document owner (`request.auth.uid == userId`) or an administrator (`isAdmin()`), preventing PII (`email`) leakage.
+   - Reading (`get`) `/users/{userId}` is strictly restricted to the document owner (`request.auth.uid == userId`) or an administrator (`isAdmin()`), and listing (`list`) `/users/{userId}` and `/admins/{adminId}` is restricted strictly to `isBootstrappedAdmin()`, preventing PII (`email`) leakage while allowing unconstrained admin directory queries.
 2. **Outlet & Vendor Ownership (`outlets/{outletId}`, `menuItems/{itemId}`, `pickupSlots/{slotId}`)**:
    - Only administrators can create or delete partner outlets.
    - Vendors can only update outlets, menu items, and pickup slots where `vendorId == request.auth.uid` and the parent `outlets/{outletId}` exists and belongs to `request.auth.uid`.
