@@ -1,0 +1,6 @@
+{
+  "name": "MessMate — Campus Meal Ordering & Pickup",
+  "description": "Mobile-friendly student meal-ordering and pickup platform with separate Student, Vendor, and Administrator portals, pickup-slot capacity tracking, and commission separation.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

@@ -1,0 +1,576 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Stores user account profile, role assignment, and optional vendor outlet assignment.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the user.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Display name of the student, vendor, or administrator.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Verified Google account email address.",
+          "minLength": 3,
+          "maxLength": 150
+        },
+        "role": {
+          "type": "string",
+          "description": "Role-based access control tier.",
+          "enum": ["student", "vendor", "admin"]
+        },
+        "assignedOutletId": {
+          "type": "string",
+          "description": "ID of the outlet managed by this user if role is vendor, or 'none'.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the account was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when the account was last updated."
+        }
+      },
+      "required": ["uid", "displayName", "email", "role", "assignedOutletId", "createdAt", "updatedAt"]
+    },
+    "AdminRecord": {
+      "title": "AdminRecord",
+      "description": "Trusted marker document granting platform administrator permissions.",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "description": "UID of the administrator.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Email of the administrator.",
+          "minLength": 3,
+          "maxLength": 150
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of admin grant."
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Outlet": {
+      "title": "Outlet",
+      "description": "Partner campus food outlet offering meals and scheduled pickup slots.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the outlet.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name of the partner outlet (clearly labelled for sample outlets).",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "campusZone": {
+          "type": "string",
+          "description": "Campus building or pickup counter location.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "cuisine": {
+          "type": "string",
+          "description": "Cuisine specialty description.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "description": {
+          "type": "string",
+          "description": "Short summary of the partner outlet.",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the vendor account managing this outlet.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "vendorName": {
+          "type": "string",
+          "description": "Display name or label of the vendor operator.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "commissionRate": {
+          "type": "number",
+          "description": "Platform commission percentage (0 to 50) charged separately or tracked on orders."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether the outlet is open and visible to students."
+        },
+        "isSample": {
+          "type": "boolean",
+          "description": "Marks clearly labelled classroom demonstration outlets."
+        },
+        "prepTimeMinutes": {
+          "type": "number",
+          "description": "Average meal preparation time in minutes."
+        },
+        "imageKey": {
+          "type": "string",
+          "description": "Visual theme key for the outlet illustration.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "campusZone",
+        "cuisine",
+        "description",
+        "vendorId",
+        "vendorName",
+        "commissionRate",
+        "isActive",
+        "isSample",
+        "prepTimeMinutes",
+        "imageKey",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "MenuItem": {
+      "title": "MenuItem",
+      "description": "Meal or beverage item belonging to a partner campus outlet.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the menu item.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "outletId": {
+          "type": "string",
+          "description": "ID of the parent outlet.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "outletName": {
+          "type": "string",
+          "description": "Name of the parent outlet.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "UID of the vendor who owns the parent outlet.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "description": "Meal title (clearly labelled for classroom demonstration).",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "category": {
+          "type": "string",
+          "description": "Menu section category.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "description": {
+          "type": "string",
+          "description": "Ingredients and portion description.",
+          "minLength": 1,
+          "maxLength": 400
+        },
+        "price": {
+          "type": "number",
+          "description": "Unit meal price in INR (excluding platform commission)."
+        },
+        "isVeg": {
+          "type": "boolean",
+          "description": "True if vegetarian meal."
+        },
+        "isSoldOut": {
+          "type": "boolean",
+          "description": "True if currently sold out and unavailable for new orders."
+        },
+        "isPublished": {
+          "type": "boolean",
+          "description": "True if visible on the student menu."
+        },
+        "isSample": {
+          "type": "boolean",
+          "description": "Marks sample meals for classroom demonstration."
+        },
+        "calories": {
+          "type": "number",
+          "description": "Approximate energy in kcal."
+        },
+        "prepMinutes": {
+          "type": "number",
+          "description": "Estimated preparation time in minutes."
+        },
+        "imageKey": {
+          "type": "string",
+          "description": "Visual illustration key for the meal card.",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "id",
+        "outletId",
+        "outletName",
+        "vendorId",
+        "name",
+        "category",
+        "description",
+        "price",
+        "isVeg",
+        "isSoldOut",
+        "isPublished",
+        "isSample",
+        "calories",
+        "prepMinutes",
+        "imageKey",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "PickupSlot": {
+      "title": "PickupSlot",
+      "description": "15-minute pickup window for an outlet with order capacity enforcement.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the pickup slot.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "outletId": {
+          "type": "string",
+          "description": "ID of the parent outlet.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "UID of the vendor managing this outlet.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "label": {
+          "type": "string",
+          "description": "Display label of the pickup window (e.g. 12:30 PM - 12:45 PM).",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "startTime": {
+          "type": "string",
+          "description": "24-hour start time string.",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "endTime": {
+          "type": "string",
+          "description": "24-hour end time string.",
+          "minLength": 1,
+          "maxLength": 20
+        },
+        "maxCapacity": {
+          "type": "number",
+          "description": "Maximum number of orders allowed in this slot."
+        },
+        "bookedCount": {
+          "type": "number",
+          "description": "Current number of active orders booked into this slot."
+        },
+        "isActive": {
+          "type": "boolean",
+          "description": "Whether this pickup slot is active for booking."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server creation timestamp."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server update timestamp."
+        }
+      },
+      "required": [
+        "id",
+        "outletId",
+        "vendorId",
+        "label",
+        "startTime",
+        "endTime",
+        "maxCapacity",
+        "bookedCount",
+        "isActive",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Student meal pickup order separating net meal sales value from platform commission.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique order document ID.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "orderNumber": {
+          "type": "string",
+          "description": "Short human-readable pickup token number.",
+          "minLength": 1,
+          "maxLength": 32
+        },
+        "studentId": {
+          "type": "string",
+          "description": "UID of the student who placed the order.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentName": {
+          "type": "string",
+          "description": "Name of the student.",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "studentEmail": {
+          "type": "string",
+          "format": "email",
+          "description": "Email of the student.",
+          "minLength": 3,
+          "maxLength": 150
+        },
+        "outletId": {
+          "type": "string",
+          "description": "ID of the partner outlet.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "outletName": {
+          "type": "string",
+          "description": "Name of the partner outlet.",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "vendorId": {
+          "type": "string",
+          "description": "UID of the vendor fulfilling the order.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "slotId": {
+          "type": "string",
+          "description": "ID of the chosen pickup slot.",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "slotLabel": {
+          "type": "string",
+          "description": "Display label of the chosen pickup slot.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "itemsSummary": {
+          "type": "string",
+          "description": "Formatted readable summary of items and quantities.",
+          "minLength": 1,
+          "maxLength": 600
+        },
+        "itemsDetail": {
+          "type": "array",
+          "description": "Bounded list (max 10) of pipe-delimited item records for repeat ordering.",
+          "maxLength": 10
+        },
+        "totalQuantity": {
+          "type": "number",
+          "description": "Total meal units in the order."
+        },
+        "mealSalesValue": {
+          "type": "number",
+          "description": "Net meal sales amount (in INR) credited to the partner outlet."
+        },
+        "commissionRate": {
+          "type": "number",
+          "description": "Platform commission percentage applied."
+        },
+        "platformCommission": {
+          "type": "number",
+          "description": "Platform service commission amount (in INR) kept strictly separate from meal sales value."
+        },
+        "totalPayable": {
+          "type": "number",
+          "description": "Total demonstration payment amount (mealSalesValue + platformCommission)."
+        },
+        "paymentMethod": {
+          "type": "string",
+          "description": "Simulated demonstration payment method.",
+          "enum": ["demo_upi", "demo_campus_card", "demo_netbanking"]
+        },
+        "paymentStatus": {
+          "type": "string",
+          "description": "Simulated demonstration payment status.",
+          "enum": ["paid_demo", "refunded_demo"]
+        },
+        "paymentRef": {
+          "type": "string",
+          "description": "Simulated transaction reference code.",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "status": {
+          "type": "string",
+          "description": "Order fulfillment lifecycle state.",
+          "enum": ["placed", "preparing", "ready_for_pickup", "picked_up", "cancelled"]
+        },
+        "pickupCode": {
+          "type": "string",
+          "description": "4-digit verification code for counter pickup.",
+          "minLength": 4,
+          "maxLength": 12
+        },
+        "notes": {
+          "type": "string",
+          "description": "Optional dietary or spice note from student.",
+          "minLength": 0,
+          "maxLength": 250
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when order was placed."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when order status last changed."
+        }
+      },
+      "required": [
+        "id",
+        "orderNumber",
+        "studentId",
+        "studentName",
+        "studentEmail",
+        "outletId",
+        "outletName",
+        "vendorId",
+        "slotId",
+        "slotLabel",
+        "itemsSummary",
+        "itemsDetail",
+        "totalQuantity",
+        "mealSalesValue",
+        "commissionRate",
+        "platformCommission",
+        "totalPayable",
+        "paymentMethod",
+        "paymentStatus",
+        "paymentRef",
+        "status",
+        "pickupCode",
+        "notes",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User accounts with strict PII isolation (readable only by owner or admin)."
+    },
+    "/admins/{adminId}": {
+      "schema": { "$ref": "#/entities/AdminRecord" },
+      "description": "Trusted administrator lookup collection."
+    },
+    "/outlets/{outletId}": {
+      "schema": { "$ref": "#/entities/Outlet" },
+      "description": "Campus dining partner outlets."
+    },
+    "/menuItems/{itemId}": {
+      "schema": { "$ref": "#/entities/MenuItem" },
+      "description": "Meals and beverages managed by partner vendors."
+    },
+    "/pickupSlots/{slotId}": {
+      "schema": { "$ref": "#/entities/PickupSlot" },
+      "description": "Scheduled 15-minute pickup slots with capacity counters."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Student meal orders with separated meal sales value and platform commission."
+    }
+  }
+}

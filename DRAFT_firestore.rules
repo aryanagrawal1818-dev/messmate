@@ -1,0 +1,534 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // =========================================================================
+    // GLOBAL SAFETY NET (Default Deny)
+    // =========================================================================
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // =========================================================================
+    // GLOBAL HARDENED PRIMITIVES
+    // =========================================================================
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isVerified() {
+      return isSignedIn() && request.auth.token.email_verified == true;
+    }
+
+    // Zero-lookup admin check safe for `allow list` blocks (no get/exists calls)
+    function isBootstrappedAdmin() {
+      return isVerified() && request.auth.token.email == 'aryanagrawal1818@gmail.com';
+    }
+
+    // Full admin check for single-document operations
+    function isAdmin() {
+      return isBootstrappedAdmin() || (isVerified() && exists(/databases/$(database)/documents/admins/$(request.auth.uid)));
+    }
+
+    // =========================================================================
+    // VALIDATION BLUEPRINTS (Anti-Update-Gap)
+    // =========================================================================
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'displayName', 'email', 'role', 'assignedOutletId', 'createdAt', 'updatedAt'])
+        && data.keys().hasOnly(['uid', 'displayName', 'email', 'role', 'assignedOutletId', 'createdAt', 'updatedAt'])
+        && isValidId(data.uid)
+        && data.displayName is string && data.displayName.size() >= 1 && data.displayName.size() <= 100
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 150
+        && data.role is string && data.role in ['student', 'vendor', 'admin']
+        && isValidId(data.assignedOutletId)
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidAdminRecord(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt'])
+        && data.keys().hasOnly(['uid', 'email', 'createdAt'])
+        && isValidId(data.uid)
+        && data.email is string && data.email.size() >= 3 && data.email.size() <= 150
+        && data.createdAt is timestamp;
+    }
+
+    function isValidOutlet(data) {
+      return data.keys().hasAll([
+          'id', 'name', 'campusZone', 'cuisine', 'description',
+          'vendorId', 'vendorName', 'commissionRate', 'isActive',
+          'isSample', 'prepTimeMinutes', 'imageKey', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'name', 'campusZone', 'cuisine', 'description',
+          'vendorId', 'vendorName', 'commissionRate', 'isActive',
+          'isSample', 'prepTimeMinutes', 'imageKey', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.campusZone is string && data.campusZone.size() >= 1 && data.campusZone.size() <= 120
+        && data.cuisine is string && data.cuisine.size() >= 1 && data.cuisine.size() <= 80
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 400
+        && isValidId(data.vendorId)
+        && data.vendorName is string && data.vendorName.size() >= 1 && data.vendorName.size() <= 100
+        && data.commissionRate is number && data.commissionRate >= 0 && data.commissionRate <= 50
+        && data.isActive is bool
+        && data.isSample is bool
+        && data.prepTimeMinutes is int && data.prepTimeMinutes >= 1 && data.prepTimeMinutes <= 120
+        && data.imageKey is string && data.imageKey.size() >= 1 && data.imageKey.size() <= 60
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidMenuItem(data) {
+      return data.keys().hasAll([
+          'id', 'outletId', 'outletName', 'vendorId', 'name', 'category',
+          'description', 'price', 'isVeg', 'isSoldOut', 'isPublished',
+          'isSample', 'calories', 'prepMinutes', 'imageKey', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'outletId', 'outletName', 'vendorId', 'name', 'category',
+          'description', 'price', 'isVeg', 'isSoldOut', 'isPublished',
+          'isSample', 'calories', 'prepMinutes', 'imageKey', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.outletId)
+        && data.outletName is string && data.outletName.size() >= 1 && data.outletName.size() <= 120
+        && isValidId(data.vendorId)
+        && data.name is string && data.name.size() >= 1 && data.name.size() <= 120
+        && data.category is string && data.category.size() >= 1 && data.category.size() <= 60
+        && data.description is string && data.description.size() >= 1 && data.description.size() <= 400
+        && data.price is number && data.price >= 1 && data.price <= 10000
+        && data.isVeg is bool
+        && data.isSoldOut is bool
+        && data.isPublished is bool
+        && data.isSample is bool
+        && data.calories is int && data.calories >= 0 && data.calories <= 4000
+        && data.prepMinutes is int && data.prepMinutes >= 1 && data.prepMinutes <= 120
+        && data.imageKey is string && data.imageKey.size() >= 1 && data.imageKey.size() <= 60
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidPickupSlot(data) {
+      return data.keys().hasAll([
+          'id', 'outletId', 'vendorId', 'label', 'startTime', 'endTime',
+          'maxCapacity', 'bookedCount', 'isActive', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'outletId', 'vendorId', 'label', 'startTime', 'endTime',
+          'maxCapacity', 'bookedCount', 'isActive', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && isValidId(data.outletId)
+        && isValidId(data.vendorId)
+        && data.label is string && data.label.size() >= 1 && data.label.size() <= 80
+        && data.startTime is string && data.startTime.size() >= 1 && data.startTime.size() <= 20
+        && data.endTime is string && data.endTime.size() >= 1 && data.endTime.size() <= 20
+        && data.maxCapacity is int && data.maxCapacity >= 1 && data.maxCapacity <= 500
+        && data.bookedCount is int && data.bookedCount >= 0 && data.bookedCount <= data.maxCapacity
+        && data.isActive is bool
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    function isValidOrder(data) {
+      return data.keys().hasAll([
+          'id', 'orderNumber', 'studentId', 'studentName', 'studentEmail',
+          'outletId', 'outletName', 'vendorId', 'slotId', 'slotLabel',
+          'itemsSummary', 'itemsDetail', 'totalQuantity', 'mealSalesValue',
+          'commissionRate', 'platformCommission', 'totalPayable',
+          'paymentMethod', 'paymentStatus', 'paymentRef', 'status',
+          'pickupCode', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && data.keys().hasOnly([
+          'id', 'orderNumber', 'studentId', 'studentName', 'studentEmail',
+          'outletId', 'outletName', 'vendorId', 'slotId', 'slotLabel',
+          'itemsSummary', 'itemsDetail', 'totalQuantity', 'mealSalesValue',
+          'commissionRate', 'platformCommission', 'totalPayable',
+          'paymentMethod', 'paymentStatus', 'paymentRef', 'status',
+          'pickupCode', 'notes', 'createdAt', 'updatedAt'
+        ])
+        && isValidId(data.id)
+        && data.orderNumber is string && data.orderNumber.size() >= 1 && data.orderNumber.size() <= 32
+        && isValidId(data.studentId)
+        && data.studentName is string && data.studentName.size() >= 1 && data.studentName.size() <= 100
+        && data.studentEmail is string && data.studentEmail.size() >= 3 && data.studentEmail.size() <= 150
+        && isValidId(data.outletId)
+        && data.outletName is string && data.outletName.size() >= 1 && data.outletName.size() <= 120
+        && isValidId(data.vendorId)
+        && isValidId(data.slotId)
+        && data.slotLabel is string && data.slotLabel.size() >= 1 && data.slotLabel.size() <= 80
+        && data.itemsSummary is string && data.itemsSummary.size() >= 1 && data.itemsSummary.size() <= 600
+        && data.itemsDetail is list && data.itemsDetail.size() >= 1 && data.itemsDetail.size() <= 10
+        && data.itemsDetail[0] is string && data.itemsDetail[0].size() >= 3 && data.itemsDetail[0].size() <= 200
+        && data.totalQuantity is int && data.totalQuantity >= 1 && data.totalQuantity <= 50
+        && data.mealSalesValue is number && data.mealSalesValue >= 0 && data.mealSalesValue <= 100000
+        && data.commissionRate is number && data.commissionRate >= 0 && data.commissionRate <= 50
+        && data.platformCommission is number && data.platformCommission >= 0 && data.platformCommission <= 50000
+        && data.totalPayable is number && data.totalPayable >= 0 && data.totalPayable <= 150000
+        && data.paymentMethod is string && data.paymentMethod in ['demo_upi', 'demo_campus_card', 'demo_netbanking']
+        && data.paymentStatus is string && data.paymentStatus in ['paid_demo', 'refunded_demo']
+        && data.paymentRef is string && data.paymentRef.size() >= 1 && data.paymentRef.size() <= 80
+        && data.status is string && data.status in ['placed', 'preparing', 'ready_for_pickup', 'picked_up', 'cancelled']
+        && data.pickupCode is string && data.pickupCode.size() >= 4 && data.pickupCode.size() <= 12
+        && data.notes is string && data.notes.size() >= 0 && data.notes.size() <= 250
+        && data.createdAt is timestamp
+        && data.updatedAt is timestamp;
+    }
+
+    // =========================================================================
+    // COLLECTION 1: /users/{userId} (PII Isolated to Owner or Admin)
+    // =========================================================================
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isBootstrappedAdmin() && resource.data.uid is string;
+
+      allow create: if isVerified()
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == userId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          // Self-registration as student only (no self-assigned roles)
+          (request.auth.uid == userId && incoming().role == 'student' && incoming().assignedOutletId == 'none')
+          || isAdmin()
+        );
+
+      allow update: if isVerified()
+        && isValidId(userId)
+        && isValidUserProfile(incoming())
+        && incoming().uid == existing().uid
+        && incoming().email == existing().email
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Owner updates own displayName only (cannot touch role or assignedOutletId)
+          (
+            request.auth.uid == userId
+            && incoming().role == existing().role
+            && incoming().assignedOutletId == existing().assignedOutletId
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'updatedAt'])
+          )
+          // Action 2: Admin manages role and outlet assignment
+          || (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'role', 'assignedOutletId', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(userId);
+    }
+
+    // =========================================================================
+    // COLLECTION 2: /admins/{adminId}
+    // =========================================================================
+    match /admins/{adminId} {
+      allow get: if isSignedIn() && isValidId(adminId) && (request.auth.uid == adminId || isAdmin());
+      allow list: if isBootstrappedAdmin() && resource.data.uid is string;
+
+      allow create: if isAdmin()
+        && isValidId(adminId)
+        && isValidAdminRecord(incoming())
+        && incoming().uid == adminId
+        && incoming().createdAt == request.time;
+
+      allow update: if isAdmin()
+        && isValidId(adminId)
+        && isValidAdminRecord(incoming())
+        && incoming().uid == existing().uid
+        && incoming().createdAt == existing().createdAt
+        && incoming().diff(existing()).affectedKeys().hasOnly(['email']);
+
+      allow delete: if isAdmin() && isValidId(adminId);
+    }
+
+    // =========================================================================
+    // COLLECTION 3: /outlets/{outletId}
+    // =========================================================================
+    match /outlets/{outletId} {
+      allow get: if isSignedIn() && isValidId(outletId) && (
+        existing().isActive == true || existing().vendorId == request.auth.uid || isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.isActive == true || resource.data.vendorId == request.auth.uid || isBootstrappedAdmin()
+      );
+
+      allow create: if isVerified()
+        && isValidId(outletId)
+        && isValidOutlet(incoming())
+        && incoming().id == outletId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && (
+          isAdmin()
+          || (incoming().isSample == true && incoming().vendorId == request.auth.uid)
+        );
+
+      allow update: if isVerified()
+        && isValidId(outletId)
+        && isValidOutlet(incoming())
+        && incoming().id == existing().id
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Assigned vendor updates operational details of own outlet
+          (
+            existing().vendorId == request.auth.uid
+            && incoming().vendorId == existing().vendorId
+            && incoming().commissionRate == existing().commissionRate
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'campusZone', 'cuisine', 'description', 'isActive', 'prepTimeMinutes', 'imageKey', 'updatedAt'
+            ])
+          )
+          // Action 2: Classroom Demo Sample Outlet Operator Assignment
+          || (
+            existing().isSample == true
+            && incoming().isSample == true
+            && incoming().vendorId == request.auth.uid
+            && incoming().commissionRate == existing().commissionRate
+            && incoming().diff(existing()).affectedKeys().hasOnly(['vendorId', 'vendorName', 'updatedAt'])
+          )
+          // Action 3: Admin updates any outlet configuration including vendor assignment & commission rate
+          || (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'campusZone', 'cuisine', 'description', 'vendorId', 'vendorName',
+              'commissionRate', 'isActive', 'isSample', 'prepTimeMinutes', 'imageKey', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(outletId);
+    }
+
+    // =========================================================================
+    // COLLECTION 4: /menuItems/{itemId}
+    // =========================================================================
+    match /menuItems/{itemId} {
+      allow get: if isSignedIn() && isValidId(itemId) && (
+        existing().isPublished == true || existing().vendorId == request.auth.uid || isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.isPublished == true || resource.data.vendorId == request.auth.uid || isBootstrappedAdmin()
+      );
+
+      allow create: if isVerified()
+        && isValidId(itemId)
+        && isValidMenuItem(incoming())
+        && incoming().id == itemId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/outlets/$(incoming().outletId))
+        && (
+          (
+            incoming().vendorId == request.auth.uid
+            && get(/databases/$(database)/documents/outlets/$(incoming().outletId)).data.vendorId == request.auth.uid
+          )
+          || isAdmin()
+        );
+
+      allow update: if isVerified()
+        && isValidId(itemId)
+        && isValidMenuItem(incoming())
+        && incoming().id == existing().id
+        && incoming().outletId == existing().outletId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Vendor manages own outlet's menu item (price, availability, sold-out state)
+          (
+            existing().vendorId == request.auth.uid
+            && incoming().vendorId == existing().vendorId
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'category', 'description', 'price', 'isVeg', 'isSoldOut',
+              'isPublished', 'calories', 'prepMinutes', 'imageKey', 'updatedAt'
+            ])
+          )
+          // Action 2: Sample item vendor sync when sample outlet operator changes
+          || (
+            existing().isSample == true
+            && incoming().isSample == true
+            && incoming().vendorId == request.auth.uid
+            && get(/databases/$(database)/documents/outlets/$(existing().outletId)).data.vendorId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly(['vendorId', 'isSoldOut', 'price', 'updatedAt'])
+          )
+          // Action 3: Admin override
+          || (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'name', 'category', 'description', 'price', 'isVeg', 'isSoldOut',
+              'isPublished', 'isSample', 'calories', 'prepMinutes', 'imageKey',
+              'vendorId', 'outletName', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerified() && isValidId(itemId) && (existing().vendorId == request.auth.uid || isAdmin());
+    }
+
+    // =========================================================================
+    // COLLECTION 5: /pickupSlots/{slotId}
+    // =========================================================================
+    match /pickupSlots/{slotId} {
+      allow get: if isSignedIn() && isValidId(slotId) && (
+        existing().isActive == true || existing().vendorId == request.auth.uid || isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.isActive == true || resource.data.vendorId == request.auth.uid || isBootstrappedAdmin()
+      );
+
+      allow create: if isVerified()
+        && isValidId(slotId)
+        && isValidPickupSlot(incoming())
+        && incoming().id == slotId
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/outlets/$(incoming().outletId))
+        && (
+          (
+            incoming().vendorId == request.auth.uid
+            && get(/databases/$(database)/documents/outlets/$(incoming().outletId)).data.vendorId == request.auth.uid
+          )
+          || isAdmin()
+        );
+
+      allow update: if isVerified()
+        && isValidId(slotId)
+        && isValidPickupSlot(incoming())
+        && incoming().id == existing().id
+        && incoming().outletId == existing().outletId
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Student booking (+1) or cancellation (-1) capacity adjustment
+          (
+            existing().isActive == true
+            && incoming().vendorId == existing().vendorId
+            && (incoming().bookedCount == existing().bookedCount + 1 || incoming().bookedCount == existing().bookedCount - 1)
+            && incoming().diff(existing()).affectedKeys().hasOnly(['bookedCount', 'updatedAt'])
+          )
+          // Action 2: Vendor slot capacity and schedule update
+          || (
+            existing().vendorId == request.auth.uid
+            && incoming().vendorId == existing().vendorId
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'label', 'startTime', 'endTime', 'maxCapacity', 'bookedCount', 'isActive', 'updatedAt'
+            ])
+          )
+          // Action 3: Sample outlet vendor sync
+          || (
+            incoming().vendorId == request.auth.uid
+            && get(/databases/$(database)/documents/outlets/$(existing().outletId)).data.vendorId == request.auth.uid
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'vendorId', 'maxCapacity', 'bookedCount', 'isActive', 'updatedAt'
+            ])
+          )
+          // Action 4: Admin override
+          || (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly([
+              'label', 'startTime', 'endTime', 'maxCapacity', 'bookedCount', 'isActive', 'vendorId', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isVerified() && isValidId(slotId) && (existing().vendorId == request.auth.uid || isAdmin());
+    }
+
+    // =========================================================================
+    // COLLECTION 6: /orders/{orderId}
+    // =========================================================================
+    match /orders/{orderId} {
+      allow get: if isSignedIn() && isValidId(orderId) && (
+        existing().studentId == request.auth.uid
+        || existing().vendorId == request.auth.uid
+        || isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        resource.data.studentId == request.auth.uid
+        || resource.data.vendorId == request.auth.uid
+        || isBootstrappedAdmin()
+      );
+
+      allow create: if isVerified()
+        && isValidId(orderId)
+        && isValidOrder(incoming())
+        && incoming().id == orderId
+        && incoming().studentId == request.auth.uid
+        && incoming().status == 'placed'
+        && incoming().paymentStatus == 'paid_demo'
+        && incoming().createdAt == request.time
+        && incoming().updatedAt == request.time
+        && exists(/databases/$(database)/documents/outlets/$(incoming().outletId))
+        && exists(/databases/$(database)/documents/pickupSlots/$(incoming().slotId));
+
+      allow update: if isVerified()
+        && isValidId(orderId)
+        && isValidOrder(incoming())
+        && incoming().id == existing().id
+        && incoming().orderNumber == existing().orderNumber
+        && incoming().studentId == existing().studentId
+        && incoming().outletId == existing().outletId
+        && incoming().vendorId == existing().vendorId
+        && incoming().slotId == existing().slotId
+        && incoming().mealSalesValue == existing().mealSalesValue
+        && incoming().commissionRate == existing().commissionRate
+        && incoming().platformCommission == existing().platformCommission
+        && incoming().totalPayable == existing().totalPayable
+        && incoming().createdAt == existing().createdAt
+        && incoming().updatedAt == request.time
+        && (
+          // Action 1: Vendor advances order fulfillment status (blocked once in terminal state)
+          (
+            existing().vendorId == request.auth.uid
+            && !(existing().status in ['picked_up', 'cancelled'])
+            && incoming().status in ['preparing', 'ready_for_pickup', 'picked_up', 'cancelled']
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'updatedAt'])
+          )
+          // Action 2: Vendor cancels order and marks demo refund (blocked once in terminal state)
+          || (
+            existing().vendorId == request.auth.uid
+            && !(existing().status in ['picked_up', 'cancelled'])
+            && incoming().status == 'cancelled'
+            && incoming().paymentStatus == 'refunded_demo'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
+          )
+          // Action 3: Student cancels own order while still in 'placed' state
+          || (
+            existing().studentId == request.auth.uid
+            && existing().status == 'placed'
+            && incoming().status == 'cancelled'
+            && incoming().paymentStatus == 'refunded_demo'
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
+          )
+          // Action 4: Admin override
+          || (
+            isAdmin()
+            && incoming().diff(existing()).affectedKeys().hasOnly(['status', 'paymentStatus', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(orderId);
+    }
+  }
+}
