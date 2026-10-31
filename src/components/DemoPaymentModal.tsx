@@ -50,7 +50,7 @@ export const DemoPaymentModal: React.FC<DemoPaymentModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-stone-950/60 backdrop-blur-xs p-0 sm:p-4 overflow-y-auto">
-      <div className="w-full max-w-lg rounded-t-3xl sm:rounded-2xl bg-white border border-stone-200 shadow-xl overflow-hidden max-h-[92dvh] sm:max-h-[calc(100dvh-2rem)] flex flex-col my-auto">
+      <div className="w-full min-w-0 max-w-lg rounded-t-3xl sm:rounded-2xl bg-white border border-stone-200 shadow-xl overflow-hidden max-h-[92dvh] sm:max-h-[calc(100dvh-2rem)] flex flex-col my-auto">
         {/* Top bar (Pinned) */}
         <div className="shrink-0 flex items-center justify-between px-5 sm:px-6 py-3.5 border-b border-stone-200 bg-stone-50">
           <div>
@@ -230,19 +230,19 @@ export const DemoPaymentModal: React.FC<DemoPaymentModalProps> = ({
           </div>
 
           {/* Pinned Bottom Action Bar */}
-          <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-stone-200 bg-stone-50 flex items-center gap-3">
+          <div className="shrink-0 px-5 sm:px-6 py-3.5 border-t border-stone-200 bg-stone-50 flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-3">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="min-h-[46px] px-4 py-2.5 rounded-xl border border-stone-300 bg-white text-sm font-semibold text-stone-700 hover:bg-stone-100 transition-colors whitespace-nowrap"
+              className="w-full sm:w-auto min-h-[46px] px-4 py-2.5 rounded-xl border border-stone-300 bg-white text-sm font-semibold text-stone-700 hover:bg-stone-100 transition-colors whitespace-nowrap"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="flex-1 min-h-[46px] px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-nowrap shadow-xs"
+              className="flex-1 min-w-0 w-full sm:w-auto min-h-[46px] px-3 sm:px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-normal sm:whitespace-nowrap shadow-xs"
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>

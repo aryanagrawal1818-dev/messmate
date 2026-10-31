@@ -431,7 +431,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
         </div>
 
         {/* Interactive Mode Switcher (Menu vs My Orders & History) */}
-        <div className="flex items-center gap-1 p-1 bg-stone-200/70 rounded-xl self-start">
+        <div className="flex flex-wrap max-w-full items-center gap-1 p-1 bg-stone-200/70 rounded-xl self-start">
           <button
             type="button"
             onClick={() => setActiveSubTab('menu')}
