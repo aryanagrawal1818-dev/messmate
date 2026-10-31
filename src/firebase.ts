@@ -1,10 +1,11 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider } from 'firebase/auth';
 import { doc, getDocFromServer, getFirestore } from 'firebase/firestore';
-import firebaseConfig from '../firebase-applet-config.json';
+import firebaseWebConfig from '../firebase-web-config.json';
 
-const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+const app = initializeApp(firebaseWebConfig);
+// Connect to the (default) Firestore database in external Spark project messmate-campus
+export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 
@@ -48,23 +49,33 @@ export function formatUserFacingFirebaseError(
   const sanitized = sanitizeErrorMessage(error);
   const lower = sanitized.toLowerCase();
 
+  if (lower.includes('auth/unauthorized-domain')) {
+    const currentHost =
+      typeof window !== 'undefined' ? window.location.hostname : 'current preview domain';
+    return `This domain (${currentHost}) is not yet authorized for OAuth popups in Firebase project "${firebaseWebConfig.projectId}". Add "${currentHost}" in Firebase Console → Authentication → Settings → Authorized domains, then click Retry or Sign in again.`;
+  }
+
+  if (lower.includes('auth/operation-not-allowed')) {
+    return `Google Sign-In is not enabled yet in Firebase project "${firebaseWebConfig.projectId}". Enable the Google provider in Firebase Console → Authentication → Sign-in method, then try again.`;
+  }
+
   if (
     lower.includes('token-service-api-has-not-been-used') ||
     lower.includes('securetoken.googleapis.com')
   ) {
-    return 'Firebase Token Service API (securetoken.googleapis.com) is not enabled or has not finished propagating in Google Cloud project 295506565539. Enable Token Service API in Google Cloud Console, wait a few minutes, and click Retry.';
+    return `Firebase Token Service API (securetoken.googleapis.com) is not enabled or has not finished propagating for project "${firebaseWebConfig.projectId}". Verify Authentication is enabled in Firebase Console, wait a few minutes, and click Retry.`;
   }
 
   if (lower.includes('identitytoolkit.googleapis.com')) {
-    return 'Identity Toolkit API (identitytoolkit.googleapis.com) is disabled in the Google Cloud project. Enable it in Google Cloud Console and click Retry.';
+    return `Identity Toolkit API (identitytoolkit.googleapis.com) is disabled in project "${firebaseWebConfig.projectId}". Enable Google Authentication in Firebase Console and click Retry.`;
   }
 
   if (lower.includes('the client is offline') || lower.includes('unavailable')) {
-    return `Firestore database connection is currently unavailable (${operationType} on ${path || 'database'}). Check your network or Firebase configuration and click Retry.`;
+    return `Firestore database (${firebaseWebConfig.projectId} / (default)) is currently unreachable (${operationType} on ${path || 'database'}). Ensure the (default) Firestore database is created in Firebase Console and click Retry.`;
   }
 
   if (lower.includes('missing or insufficient permissions') || lower.includes('permission-denied')) {
-    return `Database permission denied during ${operationType} on "${path || 'resource'}". Verify your account role or click Retry.`;
+    return `Firestore permission denied during ${operationType} on "${path || 'resource'}" in project "${firebaseWebConfig.projectId}". Publish firestore.rules in Firebase Console → Firestore Database → Rules and click Retry.`;
   }
 
   return `Database operation (${operationType}${path ? ` on ${path}` : ''}) failed: ${sanitized}`;
