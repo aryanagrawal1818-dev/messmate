@@ -36,10 +36,16 @@ export const VendorView: React.FC<VendorViewProps> = ({
   pickupSlots,
   vendorOrders,
 }) => {
-  // Outlets strictly owned by this vendor UID
+  // Outlets owned by or explicitly assigned to this vendor profile
   const myOutlets = useMemo(
-    () => outlets.filter((o) => o.vendorId === userProfile.uid),
-    [outlets, userProfile.uid]
+    () =>
+      outlets.filter(
+        (o) =>
+          o.vendorId === userProfile.uid ||
+          (userProfile.assignedOutletId !== 'none' &&
+            o.id === userProfile.assignedOutletId)
+      ),
+    [outlets, userProfile.uid, userProfile.assignedOutletId]
   );
 
   const [selectedOutletId, setSelectedOutletId] = useState<string>(

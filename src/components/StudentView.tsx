@@ -715,13 +715,18 @@ export const StudentView: React.FC<StudentViewProps> = ({
           </div>
 
           {/* RIGHT 4 COLUMNS: Contiguous Pickup Slot & Checkout Module */}
-          <div className="lg:col-span-4 lg:sticky lg:top-20 space-y-5">
-            <div className="p-6 rounded-2xl bg-white border border-stone-200 space-y-5">
-              <div className="flex items-center justify-between border-b border-stone-100 pb-3.5">
+          <div
+            id="pickup-tray"
+            className="lg:col-span-4 scroll-mt-24 lg:sticky lg:top-[5.25rem]"
+          >
+            <div className="rounded-2xl bg-white border border-stone-200 shadow-xs lg:max-h-[calc(100dvh-6rem)] flex flex-col overflow-hidden">
+              {/* Pinned Tray Header */}
+              <div className="shrink-0 flex items-center justify-between px-5 py-3.5 border-b border-stone-100 bg-white">
                 <div className="flex items-center gap-2">
-                  <ShoppingBag className="w-5 h-5 text-amber-700" />
+                  <ShoppingBag className="w-5 h-5 text-amber-700 shrink-0" />
                   <h3 className="text-base font-bold text-stone-900">
                     Pickup Tray &amp; Slot
+                    {totalCartUnits > 0 ? ` (${totalCartUnits})` : ''}
                   </h3>
                 </div>
                 {cart.length > 0 && (
@@ -736,7 +741,7 @@ export const StudentView: React.FC<StudentViewProps> = ({
               </div>
 
               {cart.length === 0 ? (
-                <div className="py-8 text-center space-y-2">
+                <div className="p-6 py-8 text-center space-y-2">
                   <p className="text-sm font-medium text-stone-700">
                     Your pickup tray is empty
                   </p>
@@ -746,163 +751,209 @@ export const StudentView: React.FC<StudentViewProps> = ({
                 </div>
               ) : (
                 <>
-                  {/* Selected Outlet Label */}
-                  {cartOutlet && (
-                    <div className="text-xs text-stone-600 bg-stone-50 p-3 rounded-xl border border-stone-200/70">
-                      <div className="font-semibold text-stone-900">
-                        {cartOutlet.name}
+                  {/* Bounded Scrollable Tray Body (Outlet, Items, Slot Picker, Note) */}
+                  <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-5 space-y-4">
+                    {/* Selected Outlet Label */}
+                    {cartOutlet && (
+                      <div className="text-xs text-stone-600 bg-stone-50 px-3 py-2.5 rounded-xl border border-stone-200/70">
+                        <div className="font-semibold text-stone-900">
+                          {cartOutlet.name}
+                        </div>
+                        <div className="mt-0.5">{cartOutlet.campusZone}</div>
                       </div>
-                      <div className="mt-0.5">{cartOutlet.campusZone}</div>
-                    </div>
-                  )}
+                    )}
 
-                  {/* Itemized Cart List */}
-                  <div className="divide-y divide-stone-100">
-                    {cart.map((c) => (
-                      <div
-                        key={c.menuItem.id}
-                        className="py-3 flex items-center justify-between gap-3"
-                      >
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-stone-900 truncate">
-                            {c.menuItem.name.replace('[SAMPLE MEAL] ', '')}
+                    {/* Itemized Cart List */}
+                    <div className="divide-y divide-stone-100">
+                      {cart.map((c) => (
+                        <div
+                          key={c.menuItem.id}
+                          className="py-2.5 first:pt-0 last:pb-0 flex items-center justify-between gap-3"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-sm font-semibold text-stone-900 truncate">
+                              {c.menuItem.name.replace('[SAMPLE MEAL] ', '')}
+                            </div>
+                            <div className="text-xs font-mono text-stone-500 tabular-nums">
+                              {formatCurrency(c.menuItem.price)} × {c.quantity} ={' '}
+                              {formatCurrency(c.menuItem.price * c.quantity)}
+                            </div>
                           </div>
-                          <div className="text-xs font-mono text-stone-500 tabular-nums">
-                            {formatCurrency(c.menuItem.price)} × {c.quantity} ={' '}
-                            {formatCurrency(c.menuItem.price * c.quantity)}
+
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => updateCartQuantity(c.menuItem.id, -1)}
+                              className="min-h-[34px] min-w-[34px] rounded-lg border border-stone-200 flex items-center justify-center hover:bg-stone-100"
+                              aria-label="Decrease item"
+                            >
+                              <Minus className="w-3.5 h-3.5" />
+                            </button>
+                            <span className="font-mono text-xs font-bold w-5 text-center tabular-nums">
+                              {c.quantity}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => updateCartQuantity(c.menuItem.id, 1)}
+                              className="min-h-[34px] min-w-[34px] rounded-lg border border-stone-200 flex items-center justify-center hover:bg-stone-100"
+                              aria-label="Increase item"
+                            >
+                              <Plus className="w-3.5 h-3.5" />
+                            </button>
                           </div>
                         </div>
+                      ))}
+                    </div>
 
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          <button
-                            type="button"
-                            onClick={() => updateCartQuantity(c.menuItem.id, -1)}
-                            className="min-h-[36px] min-w-[36px] rounded-lg border border-stone-200 flex items-center justify-center hover:bg-stone-100"
-                            aria-label="Decrease item"
-                          >
-                            <Minus className="w-3.5 h-3.5" />
-                          </button>
-                          <span className="font-mono text-xs font-bold w-5 text-center tabular-nums">
-                            {c.quantity}
-                          </span>
-                          <button
-                            type="button"
-                            onClick={() => updateCartQuantity(c.menuItem.id, 1)}
-                            className="min-h-[36px] min-w-[36px] rounded-lg border border-stone-200 flex items-center justify-center hover:bg-stone-100"
-                            aria-label="Increase item"
-                          >
-                            <Plus className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
+                    {/* Pickup Slot Selector with Real-Time Capacity Enforcement */}
+                    <div className="space-y-2 pt-2 border-t border-stone-100">
+                      <label className="block text-xs font-semibold text-stone-800">
+                        2. Select Pickup Time Slot (Capacity Enforced)
+                      </label>
+                      <div className="space-y-1.5">
+                        {outletSlots.map((slot) => {
+                          const isFull = slot.bookedCount >= slot.maxCapacity;
+                          const spotsLeft = Math.max(
+                            0,
+                            slot.maxCapacity - slot.bookedCount
+                          );
+                          const isChosen = selectedSlotId === slot.id;
+
+                          return (
+                            <button
+                              key={slot.id}
+                              type="button"
+                              disabled={isFull}
+                              onClick={() => setSelectedSlotId(slot.id)}
+                              className={`w-full px-3 py-2.5 rounded-xl border text-left transition-colors flex items-center justify-between gap-2 ${
+                                isFull
+                                  ? 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
+                                  : isChosen
+                                  ? 'bg-stone-900 border-stone-900 text-white'
+                                  : 'bg-white border-stone-200 text-stone-800 hover:bg-stone-50'
+                              }`}
+                            >
+                              <div>
+                                <div className="text-xs font-bold font-mono">
+                                  {slot.label}
+                                </div>
+                                <div
+                                  className={`text-[11px] mt-0.5 ${
+                                    isFull
+                                      ? 'text-rose-600 font-semibold'
+                                      : isChosen
+                                      ? 'text-amber-300'
+                                      : 'text-stone-500'
+                                  }`}
+                                >
+                                  {isFull
+                                    ? 'Slot Full — Capacity Reached'
+                                    : `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} remaining`}
+                                </div>
+                              </div>
+                              <div className="text-xs font-mono font-semibold tabular-nums shrink-0">
+                                {slot.bookedCount}/{slot.maxCapacity}
+                              </div>
+                            </button>
+                          );
+                        })}
                       </div>
-                    ))}
-                  </div>
+                    </div>
 
-                  {/* Pickup Slot Selector with Real-Time Capacity Enforcement */}
-                  <div className="space-y-2.5 pt-2 border-t border-stone-100">
-                    <label className="block text-xs font-semibold text-stone-800">
-                      2. Select Pickup Time Slot (Capacity Enforced)
-                    </label>
-                    <div className="space-y-2">
-                      {outletSlots.map((slot) => {
-                        const isFull = slot.bookedCount >= slot.maxCapacity;
-                        const spotsLeft = Math.max(0, slot.maxCapacity - slot.bookedCount);
-                        const isChosen = selectedSlotId === slot.id;
-
-                        return (
-                          <button
-                            key={slot.id}
-                            type="button"
-                            disabled={isFull}
-                            onClick={() => setSelectedSlotId(slot.id)}
-                            className={`w-full p-3 rounded-xl border text-left transition-colors flex items-center justify-between gap-2 ${
-                              isFull
-                                ? 'bg-stone-100 border-stone-200 text-stone-400 cursor-not-allowed'
-                                : isChosen
-                                ? 'bg-stone-900 border-stone-900 text-white'
-                                : 'bg-white border-stone-200 text-stone-800 hover:bg-stone-50'
-                            }`}
-                          >
-                            <div>
-                              <div className="text-xs font-bold font-mono">
-                                {slot.label}
-                              </div>
-                              <div
-                                className={`text-[11px] mt-0.5 ${
-                                  isFull
-                                    ? 'text-rose-600 font-semibold'
-                                    : isChosen
-                                    ? 'text-amber-300'
-                                    : 'text-stone-500'
-                                }`}
-                              >
-                                {isFull
-                                  ? 'Slot Full — Capacity Reached'
-                                  : `${spotsLeft} spot${spotsLeft === 1 ? '' : 's'} remaining`}
-                              </div>
-                            </div>
-                            <div className="text-xs font-mono font-semibold tabular-nums shrink-0">
-                              {slot.bookedCount}/{slot.maxCapacity}
-                            </div>
-                          </button>
-                        );
-                      })}
+                    {/* Optional Dietary Note */}
+                    <div>
+                      <label className="block text-xs font-medium text-stone-600 mb-1">
+                        Pickup / Spice Note (Optional)
+                      </label>
+                      <input
+                        type="text"
+                        value={orderNotes}
+                        maxLength={200}
+                        onChange={(e) => setOrderNotes(e.target.value)}
+                        placeholder="e.g., Less spicy, no raw onion"
+                        className="w-full h-9 px-3 rounded-lg border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-stone-900"
+                      />
                     </div>
                   </div>
 
-                  {/* Optional Dietary Note */}
-                  <div>
-                    <label className="block text-xs font-medium text-stone-600 mb-1">
-                      Pickup / Spice Note (Optional)
-                    </label>
-                    <input
-                      type="text"
-                      value={orderNotes}
-                      maxLength={200}
-                      onChange={(e) => setOrderNotes(e.target.value)}
-                      placeholder="e.g., Less spicy, no raw onion"
-                      className="w-full h-10 px-3 rounded-lg border border-stone-200 text-xs focus:outline-none focus:ring-2 focus:ring-stone-900"
-                    />
-                  </div>
+                  {/* Pinned Tray Footer: Split Settlement + Proceed to Demo Payment Button */}
+                  <div className="shrink-0 p-4 sm:px-5 sm:py-4 border-t border-stone-200 bg-stone-50/90 space-y-3">
+                    <div className="space-y-1 text-xs">
+                      <div className="flex justify-between text-stone-700">
+                        <span>Meal Sales Value (To Outlet)</span>
+                        <span className="font-mono font-semibold tabular-nums">
+                          {formatCurrency(mealSalesValue)}
+                        </span>
+                      </div>
+                      <div className="flex justify-between text-stone-600">
+                        <span>Platform Commission ({commissionRate}%)</span>
+                        <span className="font-mono font-semibold tabular-nums">
+                          {formatCurrency(platformCommission)}
+                        </span>
+                      </div>
+                      <div className="pt-1.5 border-t border-stone-200/80 flex justify-between text-sm font-bold text-stone-900">
+                        <span>Total Demo Payable</span>
+                        <span className="font-mono text-amber-800 tabular-nums">
+                          {formatCurrency(totalPayable)}
+                        </span>
+                      </div>
+                    </div>
 
-                  {/* Explicit Separation of Meal Sales Value vs Platform Commission */}
-                  <div className="p-3.5 rounded-xl bg-stone-50 border border-stone-200/80 space-y-1.5 text-xs">
-                    <div className="flex justify-between text-stone-700">
-                      <span>Meal Sales Value (To Outlet)</span>
-                      <span className="font-mono font-semibold tabular-nums">
-                        {formatCurrency(mealSalesValue)}
+                    <button
+                      type="button"
+                      disabled={
+                        !selectedSlot ||
+                        selectedSlot.bookedCount >= selectedSlot.maxCapacity
+                      }
+                      onClick={() => setIsPaymentModalOpen(true)}
+                      className="w-full min-h-[46px] px-5 py-2.5 rounded-xl bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-nowrap shadow-xs"
+                    >
+                      <span>
+                        Proceed to Demo Payment · {formatCurrency(totalPayable)}
                       </span>
-                    </div>
-                    <div className="flex justify-between text-stone-600">
-                      <span>Platform Commission ({commissionRate}%)</span>
-                      <span className="font-mono font-semibold tabular-nums">
-                        {formatCurrency(platformCommission)}
-                      </span>
-                    </div>
-                    <div className="pt-1.5 border-t border-stone-200 flex justify-between text-sm font-bold text-stone-900">
-                      <span>Total Demo Payable</span>
-                      <span className="font-mono text-amber-800 tabular-nums">
-                        {formatCurrency(totalPayable)}
-                      </span>
-                    </div>
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    disabled={
-                      !selectedSlot ||
-                      selectedSlot.bookedCount >= selectedSlot.maxCapacity
-                    }
-                    onClick={() => setIsPaymentModalOpen(true)}
-                    className="w-full min-h-[48px] px-5 py-3 rounded-xl bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-sm font-semibold transition-colors flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    <span>
-                      Proceed to Demo Payment · {formatCurrency(totalPayable)}
-                    </span>
-                  </button>
                 </>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile Sticky Bottom Checkout Bar (visible on <lg when cart has items) */}
+      {activeSubTab === 'menu' && cart.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur-md border-t border-stone-200 px-4 py-3 flex items-center justify-between gap-3 shadow-lg">
+          <div className="min-w-0">
+            <div className="text-xs font-semibold text-stone-900 truncate">
+              {totalCartUnits} item{totalCartUnits === 1 ? '' : 's'} · Total{' '}
+              <span className="font-mono text-amber-800 tabular-nums">
+                {formatCurrency(totalPayable)}
+              </span>
+            </div>
+            <div className="text-[11px] text-stone-500 truncate">
+              {selectedSlot
+                ? `Slot: ${selectedSlot.label}`
+                : 'Select a pickup slot below'}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="#pickup-tray"
+              className="min-h-[40px] px-3 py-2 rounded-xl border border-stone-300 text-xs font-semibold text-stone-800 hover:bg-stone-100 flex items-center"
+            >
+              Tray &amp; Slot
+            </a>
+            <button
+              type="button"
+              disabled={
+                !selectedSlot ||
+                selectedSlot.bookedCount >= selectedSlot.maxCapacity
+              }
+              onClick={() => setIsPaymentModalOpen(true)}
+              className="min-h-[40px] px-4 py-2 rounded-xl bg-amber-700 hover:bg-amber-800 disabled:opacity-50 text-white text-xs font-semibold flex items-center"
+            >
+              Pay {formatCurrency(totalPayable)}
+            </button>
           </div>
         </div>
       )}

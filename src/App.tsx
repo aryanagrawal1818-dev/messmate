@@ -91,6 +91,40 @@ export default function App() {
     [firebaseUser]
   );
 
+  // Derive effective role and allowed portals strictly from authenticated profile
+  const effectiveRole = useMemo<UserRole | null>(() => {
+    if (!userProfile) return null;
+    if (isBootstrappedAdmin || userProfile.role === 'admin') return 'admin';
+    if (userProfile.role === 'vendor') return 'vendor';
+    return 'student';
+  }, [userProfile, isBootstrappedAdmin]);
+
+  const allowedPortals = useMemo<UserRole[]>(() => {
+    if (!effectiveRole) return [];
+    if (effectiveRole === 'admin') return ['student', 'vendor', 'admin'];
+    if (effectiveRole === 'vendor') return ['vendor'];
+    return ['student'];
+  }, [effectiveRole]);
+
+  // Reconcile selected portal view whenever profile or role changes
+  useEffect(() => {
+    if (allowedPortals.length === 0) {
+      if (activePortal !== 'student') {
+        setActivePortal('student');
+      }
+      return;
+    }
+    if (!allowedPortals.includes(activePortal)) {
+      setActivePortal(allowedPortals[0]);
+    }
+  }, [allowedPortals, activePortal]);
+
+  // Guarded active portal that cannot resolve to an unauthorized view even for a single render frame
+  const resolvedPortal = useMemo<UserRole>(() => {
+    if (allowedPortals.length === 0) return 'student';
+    return allowedPortals.includes(activePortal) ? activePortal : allowedPortals[0];
+  }, [allowedPortals, activePortal]);
+
   // 1. Non-throwing Auth State Listener — always settles authReady = true
   useEffect(() => {
     const unsubAuth = onAuthStateChanged(
@@ -669,7 +703,7 @@ export default function App() {
             </section>
 
             {/* Full-Width 3-Role Architecture Strip */}
-            <section id="workflow" className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <section id="workflow" className="scroll-mt-24 grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="p-6 rounded-2xl bg-white border border-stone-200 space-y-2">
                 <div className="flex items-center gap-2 text-sm font-bold text-stone-900">
                   <UtensilsCrossed className="w-4 h-4 text-amber-700" />
@@ -702,7 +736,7 @@ export default function App() {
             </section>
 
             {/* Preview of Sample Outlets & Meals */}
-            <section id="outlets" className="space-y-5">
+            <section id="outlets" className="scroll-mt-24 space-y-5">
               <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2">
                 <div>
                   <p className="text-xs text-stone-500">
@@ -766,8 +800,8 @@ export default function App() {
 
         {/* SIGNED-IN WORKSPACE */}
         {firebaseUser && userProfile && (
-          <div id="workspace" className="space-y-6">
-            {/* Workspace Role Switcher Toolbar (Below Header per Top Bar Contract) */}
+          <div id="workspace" className="scroll-mt-24 space-y-6">
+            {/* Workspace Role Toolbar (Below Header per Top Bar Contract) */}
             <div className="p-4 rounded-2xl bg-white border border-stone-200 flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-stone-900 text-white flex items-center justify-center font-bold text-sm shrink-0">
@@ -777,62 +811,72 @@ export default function App() {
                   <div className="text-xs text-stone-500">
                     <span>Account Role: </span>
                     <strong className="text-stone-900 uppercase">
-                      {userProfile.role}
+                      {effectiveRole || userProfile.role}
                     </strong>
                     <span aria-hidden="true"> · </span>
                     <span>{userProfile.email}</span>
                   </div>
                   <div className="text-sm font-bold text-stone-900">
-                    Classroom Demonstration Role Switcher
+                    {effectiveRole === 'admin'
+                      ? 'Classroom Demonstration Role Switcher'
+                      : effectiveRole === 'vendor'
+                      ? 'Vendor Workspace · Assigned Outlet Portal'
+                      : 'Student Workspace · Meal Ordering & Pickup'}
                   </div>
                 </div>
               </div>
 
-              {/* Role Portal Selector Buttons */}
+              {/* Role Portal Selector Buttons (Derived strictly from allowedPortals) */}
               <div className="flex items-center gap-1.5 p-1 bg-stone-100 rounded-xl flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => setActivePortal('student')}
-                  className={`min-h-[40px] px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                    activePortal === 'student'
-                      ? 'bg-stone-900 text-white shadow-xs'
-                      : 'text-stone-600 hover:text-stone-900'
-                  }`}
-                >
-                  <UtensilsCrossed className="w-3.5 h-3.5" />
-                  <span>Student Portal</span>
-                </button>
+                {allowedPortals.includes('student') && (
+                  <button
+                    type="button"
+                    onClick={() => setActivePortal('student')}
+                    className={`min-h-[40px] px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      resolvedPortal === 'student'
+                        ? 'bg-stone-900 text-white shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    <UtensilsCrossed className="w-3.5 h-3.5" />
+                    <span>Student Portal</span>
+                  </button>
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => setActivePortal('vendor')}
-                  className={`min-h-[40px] px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                    activePortal === 'vendor'
-                      ? 'bg-stone-900 text-white shadow-xs'
-                      : 'text-stone-600 hover:text-stone-900'
-                  }`}
-                >
-                  <Store className="w-3.5 h-3.5" />
-                  <span>Vendor Portal</span>
-                </button>
+                {allowedPortals.includes('vendor') && (
+                  <button
+                    type="button"
+                    onClick={() => setActivePortal('vendor')}
+                    className={`min-h-[40px] px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      resolvedPortal === 'vendor'
+                        ? 'bg-stone-900 text-white shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    <Store className="w-3.5 h-3.5" />
+                    <span>Vendor Portal</span>
+                  </button>
+                )}
 
-                <button
-                  type="button"
-                  onClick={() => setActivePortal('admin')}
-                  className={`min-h-[40px] px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
-                    activePortal === 'admin'
-                      ? 'bg-stone-900 text-white shadow-xs'
-                      : 'text-stone-600 hover:text-stone-900'
-                  }`}
-                >
-                  <UserCheck className="w-3.5 h-3.5" />
-                  <span>Administrator Console</span>
-                </button>
+                {allowedPortals.includes('admin') && (
+                  <button
+                    type="button"
+                    onClick={() => setActivePortal('admin')}
+                    className={`min-h-[40px] px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 ${
+                      resolvedPortal === 'admin'
+                        ? 'bg-stone-900 text-white shadow-xs'
+                        : 'text-stone-600 hover:text-stone-900'
+                    }`}
+                  >
+                    <UserCheck className="w-3.5 h-3.5" />
+                    <span>Administrator Console</span>
+                  </button>
+                )}
               </div>
             </div>
 
-            {/* Active Portal View */}
-            {activePortal === 'student' && (
+            {/* Guarded Active Portal View */}
+            {resolvedPortal === 'student' && allowedPortals.includes('student') && (
               <StudentView
                 userProfile={userProfile}
                 outlets={outlets}
@@ -844,7 +888,7 @@ export default function App() {
               />
             )}
 
-            {activePortal === 'vendor' && (
+            {resolvedPortal === 'vendor' && allowedPortals.includes('vendor') && (
               <VendorView
                 userProfile={userProfile}
                 outlets={outlets}
@@ -854,7 +898,7 @@ export default function App() {
               />
             )}
 
-            {activePortal === 'admin' && (
+            {resolvedPortal === 'admin' && allowedPortals.includes('admin') && (
               <AdminView
                 userProfile={userProfile}
                 outlets={outlets}
@@ -875,7 +919,7 @@ export default function App() {
       {/* QUIET FOOTER */}
       <footer
         id="accounting"
-        className="border-t border-stone-200 bg-white px-6 py-6 text-xs text-stone-500"
+        className="scroll-mt-24 border-t border-stone-200 bg-white px-6 py-6 text-xs text-stone-500"
       >
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div>
